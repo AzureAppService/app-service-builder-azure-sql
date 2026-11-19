@@ -1,0 +1,19 @@
+name: Validate sample
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  build-and-test:
+    timeout-minutes: 15
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      # Placeholder until the Azure SQL sample is contributed; replace with real build and test steps.
+      - run: |
+          for f in README.md LICENSE.md CONTRIBUTING.md .github/CODEOWNERS .github/SECURITY.md .github/dependabot.yml; do
+            test -s "$f" || { echo "missing $f"; exit 1; }
+          done
