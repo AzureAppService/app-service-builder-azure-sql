@@ -13,35 +13,17 @@ This project follows the [Microsoft Open Source Code of Conduct](https://opensou
 See the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/)
 or contact opencode@microsoft.com with additional questions or comments.
 
-## How to contribute
+## Local checks and database changes
 
-Contributions arrive through pull requests from forks:
+Use Node.js 24 and .NET 10. Run the [local checks](dab-poc/README.md#local-checks)
+before submitting changes. CI checks the UI build, DAB packaging, host behavior
+and database Bicep compilation. The official DAB validator and opt-in
+integration tests connect to SQL. Run write-enabled tests only against a
+confirmed disposable database, never the deployed demo or production.
 
-1. Fork this repository and create a branch in your fork.
-2. Open a pull request against `main`.
-3. The `build-and-test` check must pass, and a code owner
-   (see [CODEOWNERS](.github/CODEOWNERS)) must approve the latest push.
-   All review threads must be resolved. Pull requests are squash-merged.
+Read the [inventory setup guide](dab-poc/README.md#inventory-schema-rls-and-administrator-setup)
+before changing SQL. Do not modify an applied migration; add a new numbered one.
+Keep runtime permissions limited to the documented catalog, views and procedure.
 
-Direct pushes to `main` are not permitted for anyone.
-
-## Sample requirements
-
-The Azure SQL sample should mirror the
-[PostgreSQL sample](https://github.com/AzureAppService/app-service-builder-postgresql)
-and meet these requirements:
-
-- **Managed identity is required.** The app must connect to Azure SQL Database
-  with Microsoft Entra authentication via managed identity. Do not use SQL
-  authentication, passwords, or connection strings containing secrets.
-- **West US 2 is the default region** for infrastructure and documentation.
-- Extend `.github/workflows/validate.yml` so the `build-and-test` job builds and
-  tests the sample. Keep `permissions: contents: read` and pin every action to a
-  full commit SHA (SHA pinning is enforced for this repository).
-- Add the sample's package ecosystem to `.github/dependabot.yml`.
-
-## Safety
-
-Database integration tests require an explicitly confirmed dedicated seeded
-test database. Never use a production database or commit tokens, passwords,
-environment files, customer data, or resource-specific credentials.
+Never commit tokens, passwords, environment files, customer data, or
+resource-specific credentials.

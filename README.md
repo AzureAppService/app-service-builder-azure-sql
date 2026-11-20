@@ -1,17 +1,26 @@
-# App Service Builder Azure SQL sample
+# ShopStream: Inventory & Fulfillment
 
-> **Status: coming soon.** An App Service Builder sample that integrates with
-> Azure SQL Database is being contributed to this repository. Until it lands,
-> this repository contains only governance and contribution scaffolding.
+A Data API builder (DAB) sample for **Azure SQL Database**. Use provisioned or serverless compute. App Service Builder serves the React UI at `/` and DAB at `/api`. Microsoft Entra sign-in and SQL row-level security scope inventory to each caller's warehouses. SQL handles receive, adjust, reserve and release commands transactionally, with durable receipts and movement history.
 
-The sample will mirror the
-[App Service Builder PostgreSQL sample](https://github.com/AzureAppService/app-service-builder-postgresql):
-an App Service Builder Preview DEV/TEST demonstration where external resources
-(the Azure SQL server and database) require manual setup.
+The [DAB app and setup guide](dab-poc/README.md) covers the protected ingress, managed identity for Azure SQL, database setup, API and deployment. Use **`dab-poc`** as the Builder source directory.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute and
-[SECURITY.md](.github/SECURITY.md) to report security issues.
+| Path | Purpose |
+| --- | --- |
+| `dab-poc/` | DAB configuration, .NET launcher, and React production UI |
+| `db/inventory/` | Inventory schema migrations and administrator tooling |
+| `infra/main.bicep` | Optional Azure SQL Database provisioning example using serverless compute |
+| `test/` | Offline checks and opt-in SQL integration checks |
 
-## License
+Use Node.js 24 and .NET 10. From the repository root:
 
-[MIT](LICENSE.md)
+```powershell
+npm ci
+npm test
+npm ci --prefix dab-poc\ui
+npm run build
+builder manifest validate dab-poc --json
+```
+
+Node.js is used for the frontend build and database administration, not as the API server. The original Express marketplace is preserved on [`nodejs-azure-sql-serverless`](https://github.com/saurabh500/app-service-builder-postgresql/tree/nodejs-azure-sql-serverless). This branch contains only the DAB app and its supporting files.
+
+Based on the MIT-licensed [ShopStream sample](https://github.com/AzureAppService/app-service-builder-postgresql). See [LICENSE.md](LICENSE.md).
