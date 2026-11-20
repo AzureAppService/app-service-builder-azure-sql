@@ -65,7 +65,7 @@ access was denied".
 ## Required configuration and security
 
 - Set `ASPNETCORE_URLS=http://0.0.0.0:8080`.
-- Add an **Azure SQL Database** Builder Connection named `database` that uses the
+- Add an **Azure SQL** Builder Connection named `database` that uses the
   app's system-assigned identity. Builder delivers its passwordless connection
   string to DAB as `SQL_CONNECTION_STRING`; don't also set that variable manually.
   [`connection.json`](../connection.json) is the template; see
@@ -105,7 +105,8 @@ see [SQL network access](#sql-network-access).
 
 ## Add the Builder Connection
 
-In the Portal, open the app's **Connections**, add **Azure SQL Database**, select
+In App Service Builder, open the app's **Architecture** page, select **Add connection**,
+choose **Azure SQL**, select
 the logical server and the app's system-assigned identity, and keep the generated
 `SQL_CONNECTION_STRING` mapping with your database name. For CLI or ARM, copy
 [`connection.json`](../connection.json) to an ignored `.local/connection.json`,
@@ -141,15 +142,15 @@ every `/api` request is anonymous and the inventory panel shows an access error.
 Setting `WEBSITE_AUTH_ENABLED=true` only satisfies DAB's production-mode check;
 it does **not** turn on sign-in.
 
-In the Portal, open the app's **Authentication** page:
+In App Service Builder, open the app's **Authentication** page:
 
 1. Under **Choose when visitors sign in**, select **Required**.
-2. Under **Choose sign-in providers**, turn on **Microsoft Entra ID** and keep
-   the managed application.
-3. Turn on **Limit to specific identities**. Add your tenant ID and the object ID
-   of each person who will use the app, including the manager whose object ID
-   you passed to `migrate`.
-4. **Save**, then select **Test sign-in**.
+2. Under **Choose sign-in providers**, turn on **Microsoft Entra ID** and leave
+   **Use your own application** off to keep the managed application.
+3. Turn on **Limit to specific identities**. Under **Tenant IDs**, add your tenant
+   ID. Under **Object IDs**, add the object ID of each person who will use the app,
+   including the manager whose object ID you passed to `migrate`.
+4. Select **Save**, then **Test sign-in**.
 
 Prefer object IDs to email rules; an object ID is unique only within its tenant,
 so keep the tenant rule. Find a user's object ID with:
@@ -183,7 +184,8 @@ The PUT replaces the allowlist, so include every object ID to keep. Wait until
 Sign-in admits a user to the app; SQL warehouse membership decides what they
 see. Give each additional user both:
 
-1. Add their object ID to **Limit to specific identities** (or `allowedObjectIds`).
+1. Add their object ID under **Authentication** > **Limit to specific identities** >
+   **Object IDs** (or `allowedObjectIds`), then select **Save**.
 2. As the Entra SQL administrator, add a warehouse membership. They don't need
    their own SQL user: the app connects as its managed identity, and RLS reads
    the signed-in user's tenant and object IDs.
