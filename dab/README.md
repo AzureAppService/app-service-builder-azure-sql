@@ -437,20 +437,6 @@ isolated preview slot. Confirm its GitHub source branch and `autoDeploy` state
 before subsequently pushing. Do not start a duplicate manual deployment while
 a push-triggered deployment is already running.
 
-## Builder Connection verification, 2026-11-20 UTC
-
-A new dedicated DEV/TEST setup (`westus2`, serverless database from
-`infra/main.bicep`, pinned catalog bootstrap, migrations 001–004) was deployed from
-this source with the `azureSql` Connection supplying `SQL_CONNECTION_STRING`
-(no manual SQL variable) and the app's system-assigned identity. Required Entra
-ingress limited to one tenant and object ID. The SQL network path was the approved
-`AllowAllWindowsAzureIps` rule described above. Checks: anonymous `/`, `/api/*` and a forged
-principal-header POST returned 401; signed-in `/api/products`, `/api/categories`,
-`/api/access` and `/api/warehouses` returned SQL data with the caller's own RLS
-identity; one disposable `receive` command returned 201 `applied`, its receipt
-was readable, on-hand rose by one, and a POST without `X-Inventory-Command`
-returned 403. Not exercised: a second user, revoked access, auto-pause/resume.
-
 ## Inventory verification, 2026-11-19 UTC
 
 The inventory schema and four migrations were installed in the existing demo
