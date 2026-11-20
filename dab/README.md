@@ -47,8 +47,11 @@ check startup, ingress authentication, actual SQL reads and unauthorized write d
 ## Required configuration and security
 
 - Set `ASPNETCORE_URLS=http://0.0.0.0:8080`.
-- Set `SQL_CONNECTION_STRING` to a passwordless Azure SQL connection string:
-  `Server=tcp:<existing-server>.database.windows.net,1433;Database=<existing-database>;Authentication=Active Directory Managed Identity;Encrypt=True;TrustServerCertificate=False;Connect Timeout=60;Min Pool Size=0;Max Pool Size=5;ConnectRetryCount=0;`.
+- Add an **Azure SQL Database** Builder Connection named `database` that uses the
+  app's system-assigned identity. Builder delivers its passwordless connection
+  string to DAB as `SQL_CONNECTION_STRING`; don't also set that variable manually.
+  [`connection.json`](../connection.json) is the template; see
+  [Add the Builder Connection](#add-the-builder-connection).
 - Assign the new app its own system-assigned identity. An SQL administrator
   must create a separate contained user using that identity's **client ID**
   as the SQL SID. Grant SELECT on the two catalog tables, then use the inventory
@@ -79,7 +82,57 @@ This is a small middleware check inside DAB's existing ASP.NET pipeline, not
 another HTTP server. Keep it with the protected ingress and closed CORS policy.
 
 No customer/order/review data is exposed. SQL network access is still required;
-this sample reuses the already approved networking for the existing database.
+see [SQL network access](#sql-network-access).
+
+## Add the Builder Connection
+
+In the Portal, open the app's **Connections**, add **Azure SQL Database**, select
+the logical server and the app's system-assigned identity, and keep the generated
+`SQL_CONNECTION_STRING` mapping with your database name. For CLI or ARM, copy
+[`connection.json`](../connection.json) to an ignored `.local/connection.json`,
+fill in the server resource ID, server name and database, then use Builder
+`app connections add --connection-json` where available, or this ETag-guarded
+ARM PATCH (Bash and `jq`), which preserves other connections:
+
+```bash
+APP_URL="https://management.azure.com/subscriptions/$SUBSCRIPTION/resourceGroups/$RG/providers/Microsoft.Web/builderApps/$APP?api-version=2026-09-01-preview"
+az rest --method get --url "$APP_URL" > .local/app.json
+ETAG="$(jq -er .etag .local/app.json)"
+jq --slurpfile next .local/connection.json '
+  {properties:{versionConfiguration:{connections:
+    ((.properties.versionConfiguration.connections // [] |
+      map(select((.name|ascii_downcase) != ($next[0].name|ascii_downcase)))) + $next)}}}
+' .local/app.json > .local/update.json
+az rest --method patch --url "$APP_URL" --headers "If-Match=$ETAG" --body @.local/update.json
+```
+
+On `412`, read the app again; don't bypass the guard. The resource ID is the
+logical server (`Microsoft.Sql/servers/<server>`); the database goes in the
+connection string. Builder's `SqlConnectionString` validator requires
+`Encrypt=True;TrustServerCertificate=False` and rejects pool and retry keywords
+such as `Max Pool Size` and `ConnectRetryCount`, so SqlClient defaults apply
+(`Min Pool Size` is already 0). A saved Connection doesn't grant SQL access:
+complete the contained-user and grant steps below, then verify reads from the
+deployed app.
+
+## SQL network access
+
+[`infra/main.bicep`](../infra/main.bicep) leaves the public firewall closed and
+allows only explicit client IPs for administrator setup. Builder apps don't have
+a stable outbound IP, so a new app can't reach SQL under those rules alone.
+For DEV/TEST only, after explicit approval of its scope, you can enable
+**Allow Azure services and resources to access this server**:
+
+```bash
+az sql server firewall-rule create -g "$RG" -s "$SQL_SERVER_NAME" \
+  -n AllowAllWindowsAzureIps --start-ip-address 0.0.0.0 --end-ip-address 0.0.0.0
+```
+
+This rule admits Azure-origin traffic from any subscription or tenant, not just
+your app. It isn't an all-internet rule, but it's a broad tradeoff, not
+production isolation; Entra-only authentication, the contained least-privilege
+user and TLS still apply. The template doesn't create it. If that admission is
+unacceptable, stop rather than enabling SQL authentication or weakening TLS.
 
 ## Database prerequisites
 
@@ -383,6 +436,20 @@ This deploys to the existing app and affects its serving version; it is not an
 isolated preview slot. Confirm its GitHub source branch and `autoDeploy` state
 before subsequently pushing. Do not start a duplicate manual deployment while
 a push-triggered deployment is already running.
+
+## Builder Connection verification, 2026-11-20 UTC
+
+A new dedicated DEV/TEST setup (`westus2`, serverless database from
+`infra/main.bicep`, pinned catalog bootstrap, migrations 001–004) was deployed from
+this source with the `azureSql` Connection supplying `SQL_CONNECTION_STRING`
+(no manual SQL variable) and the app's system-assigned identity. Required Entra
+ingress limited to one tenant and object ID. The SQL network path was the approved
+`AllowAllWindowsAzureIps` rule described above. Checks: anonymous `/`, `/api/*` and a forged
+principal-header POST returned 401; signed-in `/api/products`, `/api/categories`,
+`/api/access` and `/api/warehouses` returned SQL data with the caller's own RLS
+identity; one disposable `receive` command returned 201 `applied`, its receipt
+was readable, on-hand rose by one, and a POST without `X-Inventory-Command`
+returned 403. Not exercised: a second user, revoked access, auto-pause/resume.
 
 ## Inventory verification, 2026-11-19 UTC
 

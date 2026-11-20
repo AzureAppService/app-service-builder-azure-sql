@@ -5,7 +5,7 @@ targetScope = 'resourceGroup'
 @maxLength(63)
 param serverName string
 
-param location string = resourceGroup().location
+param location string = 'westus2'
 param databaseName string = 'shopstream'
 
 @description('Entra administrator object ID, never the web runtime identity.')
