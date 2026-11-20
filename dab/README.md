@@ -18,8 +18,9 @@ target installs the pinned official `Microsoft.DataApiBuilder` .NET tool into
 the deployment output, compiles the small `host` entry point against those exact
 binaries, and copies the config and launch script. The entry point registers the
 inventory request-header check and calls the official DAB CLI in-process. It does not implement
-another HTTP server. There is no container sidecar. Select `dab-poc` as the
-Builder app's GitHub source `--root-directory`.
+another HTTP server. There is no container sidecar. Use the repository root for
+the Builder app's GitHub source. The root manifest points to `dab/ui` for
+the UI and `dab` for DAB.
 
 ### Comparison with the official .NET sample
 
@@ -277,10 +278,10 @@ From the repository root:
 
 ```powershell
 npm ci
-npm ci --prefix dab-poc\ui
+npm ci --prefix dab\ui
 npm test
 npm run build
-builder manifest validate dab-poc --json
+builder manifest validate --json
 dotnet run --project test\dab-host\DabHostTests.csproj --configuration Release
 ```
 
@@ -297,7 +298,7 @@ Install the pinned .NET tool in a disposable local tool directory with .NET 10:
 
 ```powershell
 dotnet tool install --tool-path <local-tool-directory> Microsoft.DataApiBuilder --version 2.1.5
-& <local-tool-directory>\dab.cmd validate --config dab-poc\dab-config.json
+& <local-tool-directory>\dab.cmd validate --config dab\dab-config.json
 ```
 
 Validation connects to SQL and requires a `SQL_CONNECTION_STRING` environment
@@ -348,12 +349,14 @@ database connectivity or authorization. With the UI installed, an HTML 200
 at `/` proves only frontend delivery; check `/api/products` separately.
 
 To try local source before pushing, create a ZIP with `builder.yaml` at its
-root, plus `DabBackend.csproj`, `dab-config.json`, `start-dab.sh`, the `host`
-project/source, UI source/package/lock files and license. Exclude `.env`, Git
+root, plus `LICENSE.md` and the deployable files under `dab/`:
+`DabBackend.csproj`, `dab-config.json`, `start-dab.sh`, the `host/` project and
+source, and the `ui/` source, package and lock files. Preserve these paths in
+the ZIP. Exclude `.env`, Git
 metadata, `node_modules`, `dist`, `bin`, `obj` and caches. Use the prepared-manifest CLI workflow:
 
 ```powershell
-builder app deploy --name <existing-dab-app> --subscription <subscription> --resource-group <group> --source-archive <source.zip> --manifest dab-poc\builder.yaml --json
+builder app deploy --name <existing-dab-app> --subscription <subscription> --resource-group <group> --source-archive <source.zip> --manifest builder.yaml --json
 ```
 
 This deploys to the existing app and affects its serving version; it is not an
