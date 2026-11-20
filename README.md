@@ -1,17 +1,40 @@
-# App Service Builder Azure SQL sample
+# ShopStream: Inventory & Fulfillment
 
-> **Status: coming soon.** An App Service Builder sample that integrates with
-> Azure SQL Database is being contributed to this repository. Until it lands,
-> this repository contains only governance and contribution scaffolding.
+A Data API builder (DAB) sample for **Azure SQL Database**. Use provisioned or serverless compute. App Service Builder serves the React UI at `/` and DAB at `/api`. Microsoft Entra sign-in and SQL row-level security scope inventory to each caller's warehouses. SQL handles receive, adjust, reserve and release commands transactionally, with durable receipts and movement history.
 
-The sample will mirror the
-[App Service Builder PostgreSQL sample](https://github.com/AzureAppService/app-service-builder-postgresql):
-an App Service Builder Preview DEV/TEST demonstration where external resources
-(the Azure SQL server and database) require manual setup.
+The [DAB app and setup guide](dab/README.md) covers the protected ingress, managed identity for Azure SQL, database setup, API and deployment. Use the **repository root** as the Builder source directory. Follow its [setup steps](dab/README.md#setup-steps) in order: the app only works after you [require Microsoft Entra sign-in](dab/README.md#require-microsoft-entra-sign-in) and allow each user.
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) to contribute and
-[SECURITY.md](.github/SECURITY.md) to report security issues.
+| Path | Purpose |
+| --- | --- |
+| `builder.yaml` | Builder configuration for the UI and DAB API |
+| `dab/` | DAB configuration, .NET launcher, and React production UI |
+| `db/inventory/` | Inventory schema migrations and administrator tooling |
+| `infra/main.bicep` | Optional Azure SQL Database provisioning example using serverless compute |
+| `test/` | Offline checks and opt-in SQL integration checks |
 
-## License
+Use Node.js 24 and .NET 10. From the repository root:
 
-[MIT](LICENSE.md)
+```powershell
+npm ci
+npm test
+npm ci --prefix dab\ui
+npm run build
+builder manifest validate --json
+```
+
+Node.js is used for the frontend build and database administration, not as the API server. The original Express marketplace is preserved on [`nodejs-azure-sql-serverless`](https://github.com/saurabh500/app-service-builder-postgresql/tree/nodejs-azure-sql-serverless). This branch contains only the DAB app and its supporting files.
+
+## Set up with GitHub Copilot
+
+Ask Copilot “Help me set up this ShopStream app on Azure” to use the repository's [`setup-shopstream` skill](.github/skills/setup-shopstream/SKILL.md). It guides database setup, managed identity, app settings, and deployment.
+
+For general Azure SQL help, we recommend the optional [Microsoft SQL marketplace](https://github.com/microsoft/microsoft-sql). In Copilot CLI, opt in with:
+
+```shell
+copilot plugin marketplace add microsoft/microsoft-sql
+copilot plugin install microsoft-sql@microsoft-sql
+```
+
+In VS Code, follow the marketplace's [VS Code instructions](https://github.com/microsoft/microsoft-sql#github-copilot-in-visual-studio-code) for `microsoft-sql-vscode`. The marketplace plugin is optional and separate from the MSSQL extension recommendation.
+
+Based on the MIT-licensed [ShopStream sample](https://github.com/AzureAppService/app-service-builder-postgresql). See [LICENSE.md](LICENSE.md).

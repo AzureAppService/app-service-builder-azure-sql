@@ -1,0 +1,17 @@
+{
+  "name": "shopstream-dab-admin",
+  "version": "2.0.0",
+  "description": "Database administration and tests for ShopStream DAB",
+  "private": true,
+  "scripts": {
+    "build": "npm run build --prefix dab/ui",
+    "test": "node --test test/*.test.js",
+    "test:integration": "node --test test/inventory/integration.test.js"
+  },
+  "dependencies": {
+    "mssql": "^12.2.0"
+  },
+  "engines": {
+    "node": "24.x"
+  }
+}

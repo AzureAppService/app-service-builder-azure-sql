@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+  <Target Name="PackageDab">
+    <Error Condition="'$(DabOutput)' == ''" Text="DabOutput must name the deployment output directory." />
+    <Exec Command="dotnet tool install --tool-path &quot;$(DabOutput)&quot; Microsoft.DataApiBuilder --version 2.1.5" />
+    <ItemGroup>
+      <DabDependencies Include="$(DabOutput)/.store/**/Microsoft.DataApiBuilder.deps.json" />
+    </ItemGroup>
+    <Error Condition="'@(DabDependencies->Count())' != '1'" Text="Expected exactly one pinned DAB runtime." />
+    <PropertyGroup>
+      <DabToolDirectory>@(DabDependencies->'%(RootDir)%(Directory).')</DabToolDirectory>
+    </PropertyGroup>
+    <Exec Command="dotnet build host/DabHost.csproj --configuration Release --output &quot;$(DabToolDirectory)&quot; -property:DabToolDirectory=&quot;$(DabToolDirectory)&quot;" />
+    <Copy SourceFiles="dab-config.json;start-dab.sh" DestinationFolder="$(DabOutput)" />
+  </Target>
+</Project>

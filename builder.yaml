@@ -1,0 +1,18 @@
+components:
+  - name: catalog
+    role: static
+    rootDirectory: dab/ui
+    platform: nodejs
+    platformVersion: "24"
+    output: dist
+    path: /
+  - name: api
+    role: web
+    rootDirectory: dab
+    path: /api
+    platform: dotnet
+    platformVersion: "10"
+    build: dotnet msbuild DabBackend.csproj -target:PackageDab -property:DabOutput="$DESTINATION_DIR"
+    run:
+      start: sh ./start-dab.sh
+      port: 8080

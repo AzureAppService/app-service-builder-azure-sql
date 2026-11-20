@@ -12,8 +12,21 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      # Placeholder until the Azure SQL sample is contributed; replace with real build and test steps.
-      - run: |
-          for f in README.md LICENSE.md CONTRIBUTING.md .github/CODEOWNERS .github/SECURITY.md .github/dependabot.yml; do
-            test -s "$f" || { echo "missing $f"; exit 1; }
-          done
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            dab/ui/package-lock.json
+      - run: npm ci
+      - run: npm test
+      - run: npm ci --prefix dab/ui && npm run build
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          dotnet-version: '10.0.x'
+      - name: Package DAB
+        run: |
+          dotnet msbuild dab/DabBackend.csproj -target:PackageDab -property:DabOutput="$RUNNER_TEMP/dab-artifact"
+      - run: dotnet run --project test/dab-host/DabHostTests.csproj --configuration Release
+      - run: az bicep build --file infra/main.bicep --stdout > /dev/null

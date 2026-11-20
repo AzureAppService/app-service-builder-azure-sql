@@ -1,0 +1,15 @@
+{
+  "name": "database",
+  "type": "azureSql",
+  "resourceId": "/subscriptions/<subscription-id>/resourceGroups/<database-group>/providers/Microsoft.Sql/servers/<server>",
+  "managedIdentity": {
+    "type": "SystemAssigned"
+  },
+  "settings": [
+    {
+      "field": "connectionString",
+      "value": "Server=tcp:<server>.database.windows.net,1433;Database=<database>;Authentication=Active Directory Managed Identity;Encrypt=True;TrustServerCertificate=False;Connect Timeout=60;",
+      "environmentVariable": "SQL_CONNECTION_STRING"
+    }
+  ]
+}
