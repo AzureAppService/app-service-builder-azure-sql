@@ -44,6 +44,24 @@ See [Builder's custom-build contract](https://builder.appservice.azure.com/docs/
 Neither comparison nor local manifest validation proves hosted readiness:
 check startup, ingress authentication, actual SQL reads and unauthorized write denial.
 
+## Setup steps
+
+Complete these in order. The app doesn't work until every step is done; skipping
+sign-in in particular leaves the inventory panel showing "Your sign-in has expired or
+access was denied".
+
+1. Prepare the database: [Database prerequisites](#database-prerequisites), then
+   run the inventory migration in [Inventory schema, RLS and administrator setup](#inventory-schema-rls-and-administrator-setup).
+2. Create the Builder app from the repository root, enable its system-assigned
+   identity, and set the variables in [Required configuration and security](#required-configuration-and-security).
+3. [Add the Builder Connection](#add-the-builder-connection).
+4. [Require Microsoft Entra sign-in](#require-microsoft-entra-sign-in) and allow
+   each person who will use the app.
+5. Open an approved [SQL network access](#sql-network-access) path.
+6. Create the app's contained SQL user, grant reads, and deploy following
+   [Enable writes on a fresh app](#enable-writes-on-a-fresh-app).
+7. [Verify sign-in and inventory](#verify-sign-in-and-inventory).
+
 ## Required configuration and security
 
 - Set `ASPNETCORE_URLS=http://0.0.0.0:8080`.
@@ -57,7 +75,8 @@ check startup, ingress authentication, actual SQL reads and unauthorized write d
   as the SQL SID. Grant SELECT on the two catalog tables, then use the inventory
   grant commands below for six read views and one procedure. Do not reuse
   the Express app's write-capable user or identity.
-- Require Microsoft Entra sign-in at Builder's ingress **before deployment**.
+- Require Microsoft Entra sign-in at Builder's ingress **before deployment**; see
+  [Require Microsoft Entra sign-in](#require-microsoft-entra-sign-in).
   The updated configuration uses DAB's `AppService` provider and `authenticated`
   permissions. It trusts the principal headers that Builder verifies,
   strips from incoming requests, and replaces. Set `WEBSITE_AUTH_ENABLED=true`
@@ -114,6 +133,75 @@ such as `Max Pool Size` and `ConnectRetryCount`, so SqlClient defaults apply
 (`Min Pool Size` is already 0). A saved Connection doesn't grant SQL access:
 complete the contained-user and grant steps below, then verify reads from the
 deployed app.
+
+## Require Microsoft Entra sign-in
+
+DAB and SQL row-level security rely on Builder's verified sign-in. Without it,
+every `/api` request is anonymous and the inventory panel shows an access error.
+Setting `WEBSITE_AUTH_ENABLED=true` only satisfies DAB's production-mode check;
+it does **not** turn on sign-in.
+
+In the Portal, open the app's **Authentication** page:
+
+1. Under **Choose when visitors sign in**, select **Required**.
+2. Under **Choose sign-in providers**, turn on **Microsoft Entra ID** and keep
+   the managed application.
+3. Turn on **Limit to specific identities**. Add your tenant ID and the object ID
+   of each person who will use the app, including the manager whose object ID
+   you passed to `migrate`.
+4. **Save**, then select **Test sign-in**.
+
+Prefer object IDs to email rules; an object ID is unique only within its tenant,
+so keep the tenant rule. Find a user's object ID with:
+
+```bash
+az ad user show --id "<user@contoso.com>" --query id -o tsv
+```
+
+For CLI or ARM, `builder app auth set --body '@auth.json'` replaces the whole
+policy. If your Builder CLI reports that auth configuration `current` was not
+found, use the ETag-guarded ARM call on `authConfigs/default` instead:
+
+```bash
+AUTH_URL="https://management.azure.com/subscriptions/$SUBSCRIPTION/resourceGroups/$RG/providers/Microsoft.Web/builderApps/$APP/authConfigs/default?api-version=2026-09-01-preview"
+ETAG="$(az rest --method get --url "$AUTH_URL" --query etag -o tsv)"
+cat > .local/auth.json <<EOF
+{"properties":{"mode":"required","primaryBrowserProvider":"entraId",
+  "entraId":{"state":"Enabled","applicationMode":"managed",
+    "allowedTenantIds":["$TENANT_ID"],
+    "allowedObjectIds":["$MANAGER_OBJECT_ID"]}}}
+EOF
+az rest --method put --url "$AUTH_URL" --headers "If-Match=$ETAG" --body @.local/auth.json
+az rest --method get --url "$AUTH_URL" --query "properties.{mode:mode,revision:revision,applied:appliedRevision}"
+```
+
+The PUT replaces the allowlist, so include every object ID to keep. Wait until
+`applied` equals `revision`.
+
+### Add another user
+
+Sign-in admits a user to the app; SQL warehouse membership decides what they
+see. Give each additional user both:
+
+1. Add their object ID to **Limit to specific identities** (or `allowedObjectIds`).
+2. As the Entra SQL administrator, add a warehouse membership. They don't need
+   their own SQL user: the app connects as its managed identity, and RLS reads
+   the signed-in user's tenant and object IDs.
+
+   ```sql
+   DECLARE @warehouse_id int = 1;  -- SELECT id, name FROM inventory.warehouses
+   DECLARE @tenant_id uniqueidentifier = '<tenant-id>';
+   DECLARE @object_id uniqueidentifier = '<user-object-id>';
+   DECLARE @role varchar(8) = 'viewer'; -- viewer, operator or manager
+   INSERT inventory.warehouse_members(warehouse_id, tenant_id, actor_id, role)
+     VALUES (@warehouse_id, @tenant_id, @object_id, @role);
+   ```
+
+   Viewers can read, operators can receive, reserve and release, and managers
+   can also adjust stock. The demo migration adds the two warehouses: Seattle and Austin.
+
+To revoke access, remove the object ID from the allowlist and delete the
+membership row.
 
 ## SQL network access
 
@@ -196,7 +284,7 @@ You can reuse an existing Azure SQL server and database that already contain
 the sample schema and catalog. A new Builder app does not require a new SQL
 server. Use a separate SQL user for the new app's identity.
 
-1. Configure the app's system-assigned identity, Entra-only ingress, and runtime
+1. Configure the app's system-assigned identity, [required Entra sign-in](#require-microsoft-entra-sign-in), and runtime
    settings above. After creating the SQL user and granting catalog reads, run
    `node db\inventory\setup.js grant-read` to grant access to the inventory views.
 2. Deploy a temporary copy of `dab/dab-config.json` with the `InventoryCommand`
@@ -253,6 +341,20 @@ History is append-only for the runtime identity, not SQL Ledger or tamper-proof
 against a SQL administrator. RLS depends on protected ingress and the trusted
 runtime setting session context: it does not protect against a compromised app
 identity with arbitrary SQL execution, or an administrator changing policies.
+
+## Verify sign-in and inventory
+
+1. In a private browser window, open the app URL. You should be redirected to
+   Microsoft sign-in; `curl -s -o /dev/null -w '%{http_code}' "$APP_URL/api/products"`
+   returns `401`.
+2. Sign in as an allowed user. `/.auth/me` shows your account.
+3. Select **Open inventory**. The **Warehouse** list shows only your assigned
+   warehouses, with **Your SQL role:** and your role next to it, and the balances load.
+
+If the panel shows "Your sign-in has expired or access was denied", check that
+**Required** sign-in is saved, your object ID is in the allowlist, and you have
+a warehouse membership row. **No warehouse assigned** means sign-in works but the
+membership is missing.
 
 ## API contract
 
