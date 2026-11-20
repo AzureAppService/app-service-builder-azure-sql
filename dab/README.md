@@ -52,11 +52,15 @@ access was denied".
 
 1. Prepare the database: [Database prerequisites](#database-prerequisites), then
    run the inventory migration in [Inventory schema, RLS and administrator setup](#inventory-schema-rls-and-administrator-setup).
-2. Create the Builder app from the repository root, enable its system-assigned
-   identity, and set the variables in [Required configuration and security](#required-configuration-and-security).
-3. [Add the Builder Connection](#add-the-builder-connection).
-4. [Require Microsoft Entra sign-in](#require-microsoft-entra-sign-in) and allow
-   each person who will use the app.
+2. Create the Builder app from the repository root. **Create and deploy**
+   deploys right away, so set sign-in in the create wizard's **Authentication**
+   step first; see [During app creation](#during-app-creation). The first deployment
+   can't read SQL yet; that's expected until step 6.
+3. Enable the app's system-assigned identity, set the variables in
+   [Required configuration and security](#required-configuration-and-security),
+   and [add the Builder Connection](#add-the-builder-connection).
+4. On the app's **Authentication** page, confirm sign-in is **Required** and
+   every user is allowed; see [After app creation](#after-app-creation).
 5. Open an approved [SQL network access](#sql-network-access) path.
 6. Create the app's contained SQL user, grant reads, and deploy following
    [Enable writes on a fresh app](#enable-writes-on-a-fresh-app).
@@ -75,13 +79,16 @@ access was denied".
   as the SQL SID. Grant SELECT on the two catalog tables, then use the inventory
   grant commands below for six read views and one procedure. Do not reuse
   the Express app's write-capable user or identity.
-- Require Microsoft Entra sign-in at Builder's ingress **before deployment**; see
+- Require Microsoft Entra sign-in at Builder's ingress **before the first
+  deployment**, in the create wizard; see
   [Require Microsoft Entra sign-in](#require-microsoft-entra-sign-in).
   The updated configuration uses DAB's `AppService` provider and `authenticated`
   permissions. It trusts the principal headers that Builder verifies,
   strips from incoming requests, and replaces. Set `WEBSITE_AUTH_ENABLED=true`
   for the provider's production-mode check only when that protected ingress is
-  actually enabled. This variable does not turn on authentication.
+  actually enabled. This variable does not turn on authentication. The wizard
+  has no variables step: add it on **Variables** after creation, where changes
+  apply on the next deployment (**Save and deploy**).
   Never expose a direct route around that proxy, use this setup on an
   unprotected host, or trust client-supplied identity headers.
   The deployment snapshots below predate this authentication change.
@@ -142,7 +149,26 @@ every `/api` request is anonymous and the inventory panel shows an access error.
 Setting `WEBSITE_AUTH_ENABLED=true` only satisfies DAB's production-mode check;
 it does **not** turn on sign-in.
 
-In App Service Builder, open the app's **Authentication** page:
+### During app creation
+
+In **Create Builder App**, the steps are **Choose approach**, **Connect GitHub**
+(or **Configure ZIP deploy**), **Authentication**, **App details** and **Review**.
+The final button, **Create and deploy**, deploys immediately, so protect the app
+in the wizard's **Authentication** step:
+
+1. Under **Choose when visitors sign in**, keep or select **Required**.
+2. Under **Choose sign-in providers**, keep **Microsoft Entra ID** on.
+3. Keep **Limit to specific identities** on with your tenant under **Tenant IDs**.
+   Add each user's object ID under **Object IDs** now or after creation.
+4. On **Review**, confirm **Sign-in** reads **Required with Microsoft Entra ID**
+   before selecting **Create and deploy**.
+
+Never choose **Off** or **Optional** for this app. If you create the app another
+way, apply the policy below before its first deployment.
+
+### After app creation
+
+Use the app's **Authentication** page to verify the policy and change access later:
 
 1. Under **Choose when visitors sign in**, select **Required**.
 2. Under **Choose sign-in providers**, turn on **Microsoft Entra ID** and leave
