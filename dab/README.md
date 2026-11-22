@@ -264,8 +264,8 @@ node db\catalog\setup.js bootstrap
 
 [`db/catalog`](../db/catalog) creates `dbo.vendors`, `dbo.categories` and
 `dbo.products` and seeds 525 synthetic rows in one locked transaction. It
-refuses a database that already has tables (unless they carry its own version
-marker), records version 1 in `dbo.shopstream_bootstrap`, and does nothing on
+refuses a database that already has user objects such as tables, views or
+procedures (unless they carry its own version marker), records version 1 in `dbo.shopstream_bootstrap`, and does nothing on
 repeat runs. It grants no runtime permissions and has no reset command.
 
 [`infra/main.bicep`](../infra/main.bicep) is an optional provisioning example.

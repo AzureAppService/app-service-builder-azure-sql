@@ -35,8 +35,12 @@ async function bootstrap(pool) {
       console.log(`Catalog version ${VERSION} already installed; no data changed`);
       return false;
     }
-    const tables = (await query('SELECT name FROM sys.tables WHERE is_ms_shipped = 0')).recordset;
-    if (tables.length) throw new Error('Catalog bootstrap requires an empty dedicated database; existing tables were found');
+    const existing = (await query(`
+      SELECT CONCAT(SCHEMA_NAME(schema_id), N'.', name) AS name FROM sys.objects WHERE is_ms_shipped = 0 AND parent_object_id = 0
+      UNION ALL SELECT CONCAT(SCHEMA_NAME(schema_id), N'.', name) FROM sys.types WHERE is_user_defined = 1
+      UNION ALL SELECT name FROM sys.triggers WHERE parent_class = 0 AND is_ms_shipped = 0
+    `)).recordset;
+    if (existing.length) throw new Error('Catalog bootstrap requires an empty dedicated database; existing user objects were found');
     await tx.request().batch(source('schema.sql'));
     await tx.request().batch(source('seed.sql'));
     await query('CREATE TABLE dbo.shopstream_bootstrap (version INT PRIMARY KEY, seeded_at DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME())');

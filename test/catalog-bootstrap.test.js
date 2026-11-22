@@ -4,8 +4,8 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { bootstrap } = require('../db/catalog/setup');
 
-function fakePool({ level = 160, tables = [] } = {}) {
-  const state = { level, tables: [...tables], marker: null, batches: [], commits: 0, rollbacks: 0, failSeed: false };
+function fakePool({ level = 160, tables = [], objects = [] } = {}) {
+  const state = { level, tables: [...tables], objects: [...objects], marker: null, batches: [], commits: 0, rollbacks: 0, failSeed: false };
   return {
     state,
     transaction() {
@@ -32,6 +32,7 @@ function fakePool({ level = 160, tables = [] } = {}) {
               if (text.includes("OBJECT_ID(N'dbo.shopstream_bootstrap'")) return { recordset: [{ marker: state.marker === null ? null : 1 }] };
               if (text.startsWith('SELECT version FROM dbo.shopstream_bootstrap')) return { recordset: state.marker === null ? [] : [{ version: state.marker }] };
               if (text.includes("OBJECT_ID(N'dbo.products'")) return { recordset: [{ products: state.tables.includes('products') ? 1 : null, categories: state.tables.includes('categories') ? 2 : null }] };
+              if (text.includes('FROM sys.objects')) return { recordset: [...state.tables, ...state.objects].map(name => ({ name })) };
               if (text.includes('FROM sys.tables')) return { recordset: state.tables.map(name => ({ name })) };
               if (text.startsWith('INSERT INTO dbo.shopstream_bootstrap')) pending.marker = parameters.version;
               return { recordset: [] };
@@ -69,6 +70,16 @@ test('catalog bootstrap refuses non-empty, low-compatibility or unverified datab
   const missing = fakePool();
   missing.state.marker = 1;
   await assert.rejects(bootstrap(missing), /catalog tables are missing/);
+});
+
+test('catalog bootstrap refuses databases containing only non-table user objects', async () => {
+  for (const objects of [['dbo.legacy_view'], ['dbo.legacy_procedure']]) {
+    const pool = fakePool({ objects });
+    await assert.rejects(bootstrap(pool), /empty dedicated database/);
+    assert.deepEqual(pool.state.batches, []);
+    assert.equal(pool.state.marker, null);
+    assert.equal(pool.state.rollbacks, 1);
+  }
 });
 
 test('a failed seed rolls back without recording the version marker', async () => {
