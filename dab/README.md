@@ -254,10 +254,19 @@ unacceptable, stop rather than enabling SQL authentication or weakening TLS.
 
 Use Azure SQL Database with provisioned or serverless compute. If you already
 have a populated ShopStream catalog (`dbo.products` and `dbo.categories`), skip
-catalog bootstrap. Otherwise, start with a **new, empty** DEV/TEST database and
-follow the [pinned catalog bootstrap instructions](https://github.com/saurabh500/app-service-builder-postgresql/blob/fa3aa915c6cabffc1d594675110a77f5f04f62e2/README.md#2-bootstrap-schema-and-seed-as-an-administrator)
-from a separate checkout. Do not grant the Node app's runtime permissions or
-deploy its Express app.
+catalog bootstrap. Otherwise, start with a **new, empty** DEV/TEST database
+(compatibility level 160 or later) and, as an Entra SQL administrator with the
+environment from the next section, run:
+
+```powershell
+node db\catalog\setup.js bootstrap
+```
+
+[`db/catalog`](../db/catalog) creates `dbo.vendors`, `dbo.categories` and
+`dbo.products` and seeds 525 synthetic rows in one locked transaction. It
+refuses a database that already has tables (unless they carry its own version
+marker), records version 1 in `dbo.shopstream_bootstrap`, and does nothing on
+repeat runs. It grants no runtime permissions and has no reset command.
 
 [`infra/main.bicep`](../infra/main.bicep) is an optional provisioning example.
 It creates an Entra-only serverless database with 0.5–2 vCores and 60-minute
@@ -269,7 +278,7 @@ The original `dbo` catalog stays unchanged. `db/inventory` adds warehouses,
 SQL-owned memberships, balances, reservations, durable request receipts and
 movements. The demo snapshot migration copies the active catalog's stock into two
 independent demo warehouses. It is a one-time snapshot, not synchronization with
-the Node.js application.
+the catalog's `stock_qty`.
 
 From the repository root, run `npm ci`. Use an authorized local Entra SQL
 administrator, never the app identity. Use approved SQL network access and sign
@@ -284,6 +293,7 @@ $env:ENTRA_CREDENTIAL='default'
 $env:INVENTORY_CONFIRM_DATABASE=$env:SQL_DATABASE
 $env:INVENTORY_TENANT_ID='<manager-tenant-guid>'
 $env:INVENTORY_MANAGER_OBJECT_ID='<manager-user-object-guid>'
+node db\catalog\setup.js bootstrap   # new, empty databases only
 node db\inventory\setup.js migrate
 
 $env:RUNTIME_ROLE='shopstream_dab_reader'

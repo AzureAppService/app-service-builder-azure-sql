@@ -8,6 +8,7 @@ The [DAB app and setup guide](dab/README.md) covers the protected ingress, manag
 | --- | --- |
 | `builder.yaml` | Builder configuration for the UI and DAB API |
 | `dab/` | DAB configuration, .NET launcher, and React production UI |
+| `db/catalog/` | Administrator-only catalog bootstrap for a new, empty database |
 | `db/inventory/` | Inventory schema migrations and administrator tooling |
 | `infra/main.bicep` | Optional Azure SQL Database provisioning example using serverless compute |
 | `test/` | Offline checks and opt-in SQL integration checks |
