@@ -142,6 +142,31 @@ such as `Max Pool Size` and `ConnectRetryCount`, so SqlClient defaults apply
 complete the contained-user and grant steps below, then verify reads from the
 deployed app.
 
+### User-assigned managed identity alternative
+
+The steps and [`connection.json`](../connection.json) above default to the app's
+system-assigned identity. To use a user-assigned managed identity instead:
+
+1. Attach the identity to the Builder app and use it consistently for the
+   Connection and contained SQL user. Do not mix its client ID with the
+   system-assigned identity's client ID.
+2. In your ignored `.local/connection.json`, set `managedIdentity.type` to
+   `UserAssigned` and `managedIdentity.resourceId` to the full resource ID of that
+   attached identity.
+3. Add `User Id=<user-assigned-identity-client-id>` to the Connection's
+   `connectionString` setting, retaining `Authentication=Active Directory Managed Identity`,
+   `Encrypt=True`, and `TrustServerCertificate=False`. Use the identity's
+   **client ID**, not its principal/object ID. This selects the user-assigned
+   identity for [SqlClient managed identity authentication](https://learn.microsoft.com/sql/connect/ado-net/sql/azure-active-directory-authentication#use-managed-identity-authentication).
+   Do not add a password or also set `SQL_CONNECTION_STRING` manually.
+4. Apply the Connection with the ETag-guarded workflow above, complete the same
+   contained-user and narrow grant steps below for the selected identity, and
+   deploy a new version before verifying reads.
+
+For the default system-assigned identity, omit `User Id`. Selecting an identity
+in the Connection does not by itself attach that identity to the app or grant
+database access.
+
 ## Require Microsoft Entra sign-in
 
 DAB and SQL row-level security rely on Builder's verified sign-in. Without it,
